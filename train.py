@@ -8,7 +8,7 @@ import datetime
 import data_helpers
 from text_cnn import TextCNN
 from tensorflow.contrib import learn
-
+from kinasedata import KinaseData
 # Parameters
 # ==================================================
 
@@ -38,7 +38,12 @@ print("")
 
 # Data Preparatopn
 # ==================================================
-
+#Create data
+print("Create data")
+kData = KinaseData(pathELM="All_ELM", biggerNegative=3,
+    newVector=True, windowSplit=1, nAround=5, filePos="kinase.pos",
+    fileNeg="kinase.neg")
+kData.csvToArray()
 # Load data
 print("Loading data...")
 x_text, y = data_helpers.load_data_and_labels()
@@ -56,8 +61,8 @@ y_shuffled = y[shuffle_indices]
 
 # Split train/test set
 # TODO: This is very crude, should use cross-validation
-x_train, x_dev = x_shuffled[:-1000], x_shuffled[-1000:]
-y_train, y_dev = y_shuffled[:-1000], y_shuffled[-1000:]
+x_train, x_dev = x_shuffled[:-200], x_shuffled[-200:]
+y_train, y_dev = y_shuffled[:-200], y_shuffled[-200:]
 print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
