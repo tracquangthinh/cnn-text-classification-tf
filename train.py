@@ -1,18 +1,17 @@
-#! /usr/bin/env python
-
-import tensorflow as tf
 import numpy as np
 import os
 import time
 import datetime
 import data_helpers
+import tensorflow as tf
 from text_cnn import TextCNN
 from tensorflow.contrib import learn
-from kinasedata import KinaseData
+
 # Parameters
 # ==================================================
 
 # Model Hyperparameters
+tf.flags.DEFINE_string("word2vec", None, "Word2vec file with pre-trained embeddings (default: None)")
 tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
 tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes (default: '3,4,5')")
 tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
@@ -38,12 +37,7 @@ print("")
 
 # Data Preparatopn
 # ==================================================
-#Create data
-print("Create data")
-kData = KinaseData(pathELM="All_ELM", biggerNegative=3,
-    newVector=True, windowSplit=1, nAround=5, filePos="kinase.pos",
-    fileNeg="kinase.neg")
-kData.csvToArray()
+
 # Load data
 print("Loading data...")
 x_text, y = data_helpers.load_data_and_labels()
@@ -61,8 +55,8 @@ y_shuffled = y[shuffle_indices]
 
 # Split train/test set
 # TODO: This is very crude, should use cross-validation
-x_train, x_dev = x_shuffled[:-200], x_shuffled[-200:]
-y_train, y_dev = y_shuffled[:-200], y_shuffled[-200:]
+x_train, x_dev = x_shuffled[:-300], x_shuffled[-300:]
+y_train, y_dev = y_shuffled[:-300], y_shuffled[-300:]
 print("Vocabulary Size: {:d}".format(len(vocab_processor.vocabulary_)))
 print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
@@ -87,7 +81,7 @@ with tf.Graph().as_default():
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
-        optimizer = tf.train.AdamOptimizer(1e-3)
+        optimizer = tf.train.AdamOptimizer(0.001)
         grads_and_vars = optimizer.compute_gradients(cnn.loss)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
@@ -132,6 +126,33 @@ with tf.Graph().as_default():
 
         # Initialize all variables
         sess.run(tf.initialize_all_variables())
+        # Initialize all variables
+        sess.run(tf.initialize_all_variables())
+        if FLAGS.word2vec:
+            # initial matrix with random uniform
+            initW = np.random.uniform(-0.25,0.25,(len(vocab_processor.vocabulary_), FLAGS.embedding_dim))
+            # load any vectors from the word2vec
+            print("Load word2vec file {}\n".format(FLAGS.word2vec))
+            with open(FLAGS.word2vec, "rb") as f:
+                header = f.readline()
+                vocab_size, layer1_size = map(int, header.split())
+                binary_len = np.dtype('float32').itemsize * layer1_size
+                for line in xrange(vocab_size):
+                    word = []
+                    while True:
+                        ch = f.read(1)
+                        if ch == ' ':
+                            word = ''.join(word)
+                            break
+                        if ch != '\n':
+                            word.append(ch)   
+                    idx = vocab_processor.vocabulary_.get(word)
+                    if idx != None:
+                        initW[idx] = np.fromstring(f.read(binary_len), dtype='float32')  
+                    else:
+                        f.read(binary_len)    
+
+            sess.run(cnn.W.assign(initW))
 
         def train_step(x_batch, y_batch):
             """
